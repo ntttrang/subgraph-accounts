@@ -26,6 +26,20 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           heroku --version
 
+      - name: Login to Heroku
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          echo $HEROKU_API_KEY | heroku auth:token
+
+      - name: Create or verify Heroku app
+        env:
+          HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME_STAGING }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          heroku apps:info -a $HEROKU_APP_NAME || heroku create $HEROKU_APP_NAME
+
       - name: Deploy to Heroku
         env:
           HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
