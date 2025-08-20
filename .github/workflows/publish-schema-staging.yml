@@ -44,4 +44,3 @@ jobs:
           rover subgraph publish ${GRAPH_ID}@staging \
             --schema ./schema.graphql \
             --name $SUBGRAPH \
-            --routing-url http://localhost:4002
