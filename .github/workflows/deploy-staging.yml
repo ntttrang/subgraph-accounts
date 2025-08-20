@@ -1,4 +1,4 @@
-# This job deploys the code to the staging Heroku app environment
+# This job deploys the code to the staging Render environment
 name: Staging Deploy
 
 # It runs after the PR is closed with a merge
@@ -16,56 +16,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Install Heroku CLI
-        run: |
-          curl https://cli-assets.heroku.com/install.sh | sh
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+          cache: 'npm'
 
-      - name: Verify Heroku CLI
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          heroku --version
+      - name: Install dependencies
+        run: npm ci
 
-      - name: Login to Heroku
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          echo $HEROKU_API_KEY | heroku auth:token
+      - name: Run tests (optional)
+        run: npm test --if-present
 
-      - name: List available apps
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          echo "Available Heroku apps:"
-          heroku apps
-
-      - name: Create or verify Heroku app
-        env:
-          HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME_STAGING }}
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          echo "Checking for app: $HEROKU_APP_NAME"
-          if heroku apps:info -a $HEROKU_APP_NAME; then
-            echo "App $HEROKU_APP_NAME exists"
-          else
-            echo "App $HEROKU_APP_NAME not found, creating..."
-            heroku create $HEROKU_APP_NAME
-            echo "App $HEROKU_APP_NAME created successfully"
-          fi
-
-      # - name: Set git remote
-      #   env:
-      #     HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME_STAGING }}
-      #   run: |
-      #     export PATH="$HOME/.local/bin:$PATH"
-      #     echo "Setting git remote for app: $HEROKU_APP_NAME"
-      #     /heroku git:remote -a $HEROKU_APP_NAME
-      #     git remote -v
-
-      - name: Deploy to Heroku
-        env:
-          HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME_STAGING }}
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          echo "Deploying to app: $HEROKU_APP_NAME"
-          git push heroku HEAD:main
+      - name: Deploy to Render
+        uses: johnbeynon/render-deploy-action@v0.0.8
+        with:
+          service-id: ${{ secrets.RENDER_SERVICE_ID }}
+          api-key: ${{ secrets.RENDER_API_KEY }}
