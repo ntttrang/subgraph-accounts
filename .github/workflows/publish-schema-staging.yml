@@ -17,7 +17,7 @@ jobs:
     env:
       APOLLO_KEY: ${{ secrets.APOLLO_KEY }}
       APOLLO_VCS_COMMIT: ${{ github.event.pull_request.head.sha }}
-      GRAPH_ID: mygraphv2
+      GRAPH_ID: airlock-managed-fed-3vp2p
       SUBGRAPH: accounts
     steps:
       - uses: actions/checkout@v4.1.5
