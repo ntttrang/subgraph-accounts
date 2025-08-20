@@ -16,18 +16,23 @@ jobs:
     environment: apollo
     env:
       APOLLO_KEY: ${{ secrets.APOLLO_KEY }}
-      APOLLO_VCS_COMMIT: ${{ github.event.pull_request.head.sha }}
+      APOLLO_VCS_COMMIT: ${{ github.event.workflow_run.head_sha }}
       GRAPH_ID: airlock-managed-fed
-      SUBGRAPH: schema
+      SUBGRAPH: accounts
     steps:
       - uses: actions/checkout@v4.1.5
       - name: Install Rover
         run: |
-          curl -sSL https://rover.apollo.dev/nix/v0.1.0 | sh
+          curl -sSL https://rover.apollo.dev/nix/latest | sh
 
           # Add Rover to the $GITHUB_PATH so it can be used in another step
           # https://docs.github.com/en/actions/reference/workflow-commands-for-github-actions#adding-a-system-path
           echo "$HOME/.rover/bin" >> $GITHUB_PATH
+
+      - name: Verify Rover installation
+        run: |
+          rover --version
+
       - name: Publish subgraph to staging registry
         run: |
-          rover subgraph publish ${GRAPH_ID}@staging --schema ./${SUBGRAPH}.graphql --name $SUBGRAPH
+          rover subgraph publish ${GRAPH_ID}@staging --schema ./schema.graphql --name $SUBGRAPH
