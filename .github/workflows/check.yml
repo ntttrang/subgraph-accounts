@@ -22,7 +22,7 @@ jobs:
       APOLLO_KEY: ${{ secrets.APOLLO_KEY }}
       APOLLO_VCS_COMMIT: ${{ github.event.pull_request.head.sha }}
       GRAPH_ID: airlock-managed-fed
-      SUBGRAPH: schema
+      SUBGRAPH: accounts
 
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
@@ -38,4 +38,4 @@ jobs:
           echo "$HOME/.rover/bin" >> $GITHUB_PATH
       # - name: Run check against staging variant
       #   run: |
-      #     rover subgraph check ${GRAPH_ID}@staging --schema ./${SUBGRAPH}.graphql --name $SUBGRAPH
+      #     rover subgraph check ${GRAPH_ID}@staging --schema ./schema.graphql --name $SUBGRAPH
