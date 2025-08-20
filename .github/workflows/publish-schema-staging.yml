@@ -33,6 +33,15 @@ jobs:
         run: |
           rover --version
 
+      - name: Check if graph exists
+        run: |
+          echo "Checking if graph exists: ${GRAPH_ID}"
+          rover graph list | grep ${GRAPH_ID} || echo "Graph ${GRAPH_ID} not found"
+
       - name: Publish subgraph to staging registry
         run: |
-          rover subgraph publish ${GRAPH_ID}@staging --schema ./schema.graphql --name $SUBGRAPH
+          echo "Publishing subgraph '${SUBGRAPH}' to '${GRAPH_ID}@staging'"
+          rover subgraph publish ${GRAPH_ID}@staging \
+            --schema ./schema.graphql \
+            --name $SUBGRAPH \
+            --routing-url http://localhost:4002
