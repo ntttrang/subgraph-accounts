@@ -35,8 +35,22 @@ jobs:
 
       - name: Check if graph exists
         run: |
-          echo "Checking if graph exists: ${GRAPH_ID}"
-          rover graph list | grep ${GRAPH_ID} || echo "Graph ${GRAPH_ID} not found"
+          echo "Checking if graph exists: ${GRAPH_ID}@staging"
+          rover graph fetch ${GRAPH_ID}@staging --output /dev/null && echo "Graph ${GRAPH_ID}@staging exists" || echo "Graph ${GRAPH_ID}@staging not found or not accessible"
+
+      - name: Create supergraph if it doesn't exist
+        run: |
+          echo "Checking if supergraph needs to be created..."
+          if ! rover graph fetch ${GRAPH_ID}@staging --output /dev/null 2>/dev/null; then
+            echo "Creating supergraph ${GRAPH_ID}@staging..."
+            # Create a basic supergraph schema for the staging variant
+            echo 'type Query { _service: String }' > temp-supergraph.graphql
+            rover graph publish ${GRAPH_ID}@staging --schema temp-supergraph.graphql
+            rm temp-supergraph.graphql
+            echo "Supergraph ${GRAPH_ID}@staging created successfully"
+          else
+            echo "Supergraph ${GRAPH_ID}@staging already exists"
+          fi
 
       - name: Publish subgraph to staging registry
         run: |
