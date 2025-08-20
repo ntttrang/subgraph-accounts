@@ -8,7 +8,7 @@ const gql = require("graphql-tag");
 
 const { AuthenticationError } = require("./utils/errors");
 
-const typeDefs = gql(readFileSync("./schema.graphql", { encoding: "utf-8" }));
+const typeDefs = gql(readFileSync("./accounts.graphql", { encoding: "utf-8" }));
 const resolvers = require("./resolvers");
 const AccountsAPI = require("./datasources/accounts");
 
