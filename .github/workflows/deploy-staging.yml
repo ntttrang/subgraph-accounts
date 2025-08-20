@@ -53,14 +53,14 @@ jobs:
             echo "App $HEROKU_APP_NAME created successfully"
           fi
 
-      - name: Set git remote
-        env:
-          HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME_STAGING }}
-        run: |
-          export PATH="$HOME/.local/bin:$PATH"
-          echo "Setting git remote for app: $HEROKU_APP_NAME"
-          heroku git:remote -a $HEROKU_APP_NAME
-          git remote -v
+      # - name: Set git remote
+      #   env:
+      #     HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME_STAGING }}
+      #   run: |
+      #     export PATH="$HOME/.local/bin:$PATH"
+      #     echo "Setting git remote for app: $HEROKU_APP_NAME"
+      #     /heroku git:remote -a $HEROKU_APP_NAME
+      #     git remote -v
 
       - name: Deploy to Heroku
         env:
