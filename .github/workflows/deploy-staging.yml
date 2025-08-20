@@ -7,13 +7,30 @@ on:
     types: [closed]
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     if: ${{ github.event.pull_request.merged == true }}
     steps:
-      - uses: actions/checkout@v4.1.5
-      - uses: akhileshns/heroku-deploy@v3.13.15
+      - name: Checkout code
+        uses: actions/checkout@v4.1.5
         with:
-          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
-          heroku_app_name: ${{ secrets.HEROKU_APP_NAME_STAGING }}
-          heroku_email: ${{ secrets.HEROKU_EMAIL }}
+          fetch-depth: 0
+
+      - name: Install Heroku CLI
+        run: |
+          curl https://cli-assets.heroku.com/install.sh | sh
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Verify Heroku CLI
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          heroku --version
+
+      - name: Deploy to Heroku
+        env:
+          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
+          HEROKU_APP_NAME: ${{ secrets.HEROKU_APP_NAME_STAGING }}
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          heroku git:remote -a $HEROKU_APP_NAME
+          git push heroku HEAD:main
