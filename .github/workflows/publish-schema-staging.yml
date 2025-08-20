@@ -30,4 +30,4 @@ jobs:
           echo "$HOME/.rover/bin" >> $GITHUB_PATH
       - name: Publish subgraph to staging registry
         run: |
-          rover subgraph publish ${GRAPH_ID}@staging --schema ./${SUBGRAPH}.graphql --name $SUBGRAPH --convert
+          rover subgraph publish ${GRAPH_ID}@staging --schema ./${SUBGRAPH}.graphql --name $SUBGRAPH
