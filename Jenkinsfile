@@ -1,12 +1,5 @@
 pipeline {
-    agent {
-        dockerfile {
-            filename 'Dockerfile'
-            dir '.'
-            args '-v $HOME/.npm:/root/.npm'
-            reuseNode false
-        }
-    }
+    agent any
 
     environment {
         // Apollo GraphOS configuration (from publish-schema-staging.yml)
@@ -19,8 +12,9 @@ pipeline {
         RENDER_SERVICE_ID = credentials('RENDER_SERVICE_ID')
         RENDER_API_KEY = credentials('RENDER_API_KEY')
 
-        // Node.js configuration
-        NODE_VERSION = '18'
+        // Docker configuration
+        DOCKER_IMAGE_NAME = 'subgraph-accounts'
+        DOCKER_IMAGE_TAG = "${env.BUILD_NUMBER}"
     }
 
     stages {
@@ -36,37 +30,42 @@ pipeline {
             }
         }
 
-        stage('Verify Environment') {
-            steps {
-                // Verify Node.js and Apollo Rover are available in Docker container
-                sh '''
-                    node --version
-                    npm --version
-                    rover --version
-                    echo "Docker environment ready!"
-                '''
-            }
-        }
-
-        stage('Install Dependencies') {
-            steps {
-                // Equivalent to "npm ci" from deploy-staging.yml
-                sh 'npm ci'
-            }
-        }
-
-        stage('Run Tests') {
+        stage('Build Docker Image') {
             steps {
                 script {
-                    // Equivalent to "npm test --if-present" from deploy-staging.yml
-                    try {
-                        sh 'npm test'
-                        echo 'Tests completed successfully'
-                    } catch (Exception e) {
-                        // In GitHub Actions, --if-present makes this optional
-                        // We'll make it optional in Jenkins too
-                        echo "Tests failed or no test script found: ${e.getMessage()}"
-                        echo 'Continuing with deployment...'
+                    // Build Docker image from Dockerfile
+                    sh "docker build -t ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} ."
+
+                    // Tag as latest for convenience
+                    sh "docker tag ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} ${DOCKER_IMAGE_NAME}:latest"
+                }
+            }
+        }
+
+        stage('Run Tests & Build') {
+            steps {
+                script {
+                    // Run all commands inside the Docker container
+                    docker.image("${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}").inside('-v $HOME/.npm:/root/.npm') {
+                        // Verify environment
+                        sh '''
+                            node --version
+                            npm --version
+                            rover --version
+                            echo "Docker environment ready!"
+                        '''
+
+                        // Install dependencies
+                        sh 'npm ci'
+
+                        // Run tests (optional)
+                        try {
+                            sh 'npm test'
+                            echo 'Tests completed successfully'
+                        } catch (Exception e) {
+                            echo "Tests failed or no test script found: ${e.getMessage()}"
+                            echo 'Continuing with deployment...'
+                        }
                     }
                 }
             }
@@ -75,21 +74,23 @@ pipeline {
         stage('Publish Schema') {
             steps {
                 script {
-                    // Equivalent to publish step from publish-schema-staging.yml
-                    try {
-                        sh '''
-                            # Apollo Rover is pre-installed in Docker container
-                            rover subgraph publish ${GRAPH_ID}@staging \
-                                --schema ./accounts.graphql \
-                                --name $SUBGRAPH \
-                                --routing-url http://localhost:4002 \
-                                --convert
-                        '''
-                        echo 'Schema published successfully to staging!'
-                    } catch (Exception e) {
-                        echo "Schema publishing failed: ${e.getMessage()}"
-                        // In production, you might want to fail here
-                        // throw e
+                    // Run schema publishing inside Docker container
+                    docker.image("${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG}").inside('-v $HOME/.npm:/root/.npm') {
+                        try {
+                            sh '''
+                                # Apollo Rover is available in the Docker container
+                                rover subgraph publish ${GRAPH_ID}@staging \
+                                    --schema ./accounts.graphql \
+                                    --name $SUBGRAPH \
+                                    --routing-url http://localhost:4002 \
+                                    --convert
+                            '''
+                            echo 'Schema published successfully to staging!'
+                        } catch (Exception e) {
+                            echo "Schema publishing failed: ${e.getMessage()}"
+                            // In production, you might want to fail here
+                            // throw e
+                        }
                     }
                 }
             }
@@ -113,6 +114,19 @@ pipeline {
                         echo "Render deployment failed: ${e.getMessage()}"
                         throw e
                     }
+                }
+            }
+        }
+
+        stage('Cleanup') {
+            steps {
+                script {
+                    // Clean up Docker images to save space
+                    sh '''
+                        docker rmi ${DOCKER_IMAGE_NAME}:${DOCKER_IMAGE_TAG} || true
+                        docker rmi ${DOCKER_IMAGE_NAME}:latest || true
+                        docker system prune -f || true
+                    '''
                 }
             }
         }
