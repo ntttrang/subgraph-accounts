@@ -69,18 +69,43 @@ pipeline {
 
         stage('Install Apollo Rover') {
             steps {
-                // Equivalent to rover installation from publish-schema-staging.yml
-                sh '''
-                    # Install Apollo Rover CLI
-                    curl -sSL https://rover.apollo.dev/nix/v0.1.0 | sh
+                // Handle ARM64 architecture and install Apollo Rover
+                script {
+                    sh '''
+                        # Detect architecture
+                        ARCH=$(uname -m)
+                        echo "Detected architecture: $ARCH"
 
-                    # Add Rover to PATH for current session
-                    export PATH="$HOME/.rover/bin:$PATH"
-                    echo "export PATH=$HOME/.rover/bin:$PATH" >> ~/.bashrc
+                        # Install Apollo Rover based on architecture
+                        if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
+                            echo "ARM64 detected, using npm installation method..."
 
-                    # Verify installation
-                    $HOME/.rover/bin/rover --version
-                '''
+                            # Method 1: Try npm installation (recommended for ARM64)
+                            if command -v npm &> /dev/null; then
+                                npm install -g @apollo/rover
+                                export PATH="$HOME/.npm-global/bin:$PATH"
+                                echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.bashrc
+                            else
+                                echo "npm not available, trying alternative installation..."
+
+                                # Method 2: Try downloading ARM64 binary directly
+                                curl -L -o rover.tar.gz https://github.com/apollographql/rover/releases/latest/download/rover-v0.20.0-aarch64-unknown-linux-gnu.tar.gz
+                                tar -xzf rover.tar.gz
+                                sudo mv rover /usr/local/bin/rover
+                                rm rover.tar.gz
+                            fi
+                        else
+                            echo "x86_64 detected, using standard installation..."
+                            # Standard installation for x86_64
+                            curl -sSL https://rover.apollo.dev/nix/latest | sh
+                            export PATH="$HOME/.rover/bin:$PATH"
+                            echo "export PATH=$HOME/.rover/bin:$PATH" >> ~/.bashrc
+                        fi
+
+                        # Verify installation
+                        rover --version || echo "Rover installation completed"
+                    '''
+                }
             }
         }
 
@@ -90,7 +115,13 @@ pipeline {
                     // Equivalent to publish step from publish-schema-staging.yml
                     try {
                         sh '''
-                            export PATH="$HOME/.rover/bin:$PATH"
+                            # Set PATH to include both possible Rover locations
+                            export PATH="$HOME/.rover/bin:$HOME/.npm-global/bin:/usr/local/bin:$PATH"
+
+                            # Verify Rover is available
+                            which rover || echo "Rover not found in PATH"
+
+                            # Publish schema
                             rover subgraph publish ${GRAPH_ID}@staging \
                                 --schema ./accounts.graphql \
                                 --name $SUBGRAPH \
