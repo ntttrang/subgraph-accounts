@@ -22,11 +22,11 @@ pipeline {
             }
         }
 
-        stage('Install Dependencies') {
-            steps {
-                sh 'npm ci'
-            }
-        }
+        // stage('Install Dependencies') {
+        //     steps {
+        //         sh 'npm ci'
+        //     }
+        // }
 
         stage('Run Tests') {
             steps {
