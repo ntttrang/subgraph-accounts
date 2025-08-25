@@ -22,22 +22,6 @@ pipeline {
             }
         }
 
-        stage('Setup Node.js') {
-            steps {
-                script {
-                    // Install Node.js if not available
-                    sh '''
-                        if ! command -v node &> /dev/null; then
-                            curl -fsSL https://deb.nodesource.com/setup_${NODE_VERSION}.x | sudo -E bash -
-                            sudo apt-get install -y nodejs
-                        fi
-                        node --version
-                        npm --version
-                    '''
-                }
-            }
-        }
-
         stage('Install Dependencies') {
             steps {
                 sh 'npm ci'
