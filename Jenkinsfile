@@ -13,9 +13,19 @@ pipeline {
 
         // Node.js configuration
         NODE_VERSION = '18'
+        NVM_DIR = "$HOME/.nvm"
 
-        // Ensure tools are in PATH
-        PATH = "$HOME/.rover/bin:$HOME/.nvm/versions/node/v${NODE_VERSION}/bin:$PATH"
+        // NVM setup function for reuse across stages
+        NVM_SETUP = '''
+            # Setup NVM for this stage
+            export NVM_DIR="$HOME/.nvm"
+            [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"
+
+            # Ensure we\'re using the correct Node.js version
+            if command -v nvm &> /dev/null; then
+                nvm use ${NODE_VERSION} || nvm use default || true
+            fi
+        '''
     }
 
     stages {
@@ -31,41 +41,52 @@ pipeline {
                     // Install Node.js if not available
                     sh '''
                         if ! command -v node &> /dev/null; then
-                            echo "Node.js not found, attempting to install..."
+                            echo "🔧 Node.js not found, attempting to install..."
 
                             # Try multiple installation methods without sudo
                             if command -v apt-get &> /dev/null; then
                                 # Try without sudo first (for containers with root access)
                                 apt-get update && apt-get install -y nodejs npm || {
-                                    echo "System Node.js installation failed, trying Node Version Manager..."
+                                    echo "📦 System Node.js installation failed, trying Node Version Manager..."
                                     # Fallback to nvm for user-space installation
                                     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
                                     export NVM_DIR="$HOME/.nvm"
                                     [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"
                                     nvm install ${NODE_VERSION}
                                     nvm use ${NODE_VERSION}
+                                    nvm alias default ${NODE_VERSION}
                                 }
                             elif command -v yum &> /dev/null; then
                                 yum install -y nodejs npm
                             elif command -v apk &> /dev/null; then
                                 apk add --no-cache nodejs npm
                             else
-                                echo "No package manager found, trying nvm..."
+                                echo "📦 No package manager found, trying nvm..."
                                 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
                                 export NVM_DIR="$HOME/.nvm"
                                 [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"
                                 nvm install ${NODE_VERSION}
                                 nvm use ${NODE_VERSION}
+                                nvm alias default ${NODE_VERSION}
                             fi
                         else
-                            echo "Node.js already installed"
+                            echo "✅ Node.js already installed"
                         fi
 
-                        # Ensure node and npm are in PATH
-                        export PATH="$HOME/.nvm/versions/node/v${NODE_VERSION}/bin:$PATH"
+                        # Setup NVM and Node.js for all future stages
+                        export NVM_DIR="$HOME/.nvm"
+                        [ -s "$NVM_DIR/nvm.sh" ] && \\. "$NVM_DIR/nvm.sh"
 
-                        node --version
-                        npm --version
+                        # Ensure we're using the correct Node.js version
+                        if command -v nvm &> /dev/null; then
+                            nvm use ${NODE_VERSION} || nvm use default || true
+                        fi
+
+                        # Verify installation
+                        echo "🔍 Node.js version: $(node --version)"
+                        echo "🔍 npm version: $(npm --version)"
+                        echo "🔍 Node.js path: $(which node)"
+                        echo "🔍 npm path: $(which npm)"
                     '''
                 }
             }
@@ -73,7 +94,11 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'npm ci'
+                sh """
+                    ${NVM_SETUP}
+                    echo "📦 Installing dependencies..."
+                    npm ci
+                """
             }
         }
 
@@ -84,9 +109,13 @@ pipeline {
                     if (fileExists('package.json')) {
                         def packageJson = readJSON file: 'package.json'
                         if (packageJson.scripts?.test) {
-                            sh 'npm test'
+                            sh """
+                                ${NVM_SETUP}
+                                echo "🧪 Running tests..."
+                                npm test
+                            """
                         } else {
-                            echo 'No test script found, skipping tests'
+                            echo '⏭️  No test script found, skipping tests'
                         }
                     }
                 }
