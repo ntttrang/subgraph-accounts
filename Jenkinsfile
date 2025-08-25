@@ -1,5 +1,12 @@
 pipeline {
-    agent any
+    agent {
+        dockerfile {
+            filename 'Dockerfile'
+            dir '.'
+            args '-v $HOME/.npm:/root/.npm'
+            reuseNode false
+        }
+    }
 
     environment {
         // Apollo GraphOS configuration (from publish-schema-staging.yml)
@@ -29,17 +36,15 @@ pipeline {
             }
         }
 
-        stage('Setup Node.js') {
+        stage('Verify Environment') {
             steps {
-                // Equivalent to actions/setup-node@v4 with cache
-                script {
-                    def nodeHome = tool name: "NodeJS-${NODE_VERSION}", type: 'jenkins.plugins.nodejs.tools.NodeJSInstallation'
-                    env.PATH = "${nodeHome}/bin:${env.PATH}"
-
-                    // Verify Node.js installation
-                    sh 'node --version'
-                    sh 'npm --version'
-                }
+                // Verify Node.js and Apollo Rover are available in Docker container
+                sh '''
+                    node --version
+                    npm --version
+                    rover --version
+                    echo "Docker environment ready!"
+                '''
             }
         }
 
@@ -67,61 +72,13 @@ pipeline {
             }
         }
 
-        stage('Install Apollo Rover') {
-            steps {
-                // Handle ARM64 architecture and install Apollo Rover
-                script {
-                    sh '''
-                        # Detect architecture
-                        ARCH=$(uname -m)
-                        echo "Detected architecture: $ARCH"
-
-                        # Install Apollo Rover based on architecture
-                        if [ "$ARCH" = "aarch64" ] || [ "$ARCH" = "arm64" ]; then
-                            echo "ARM64 detected, using npm installation method..."
-
-                            # Method 1: Try npm installation (recommended for ARM64)
-                            if command -v npm &> /dev/null; then
-                                npm install -g @apollo/rover
-                                export PATH="$HOME/.npm-global/bin:$PATH"
-                                echo 'export PATH="$HOME/.npm-global/bin:$PATH"' >> ~/.bashrc
-                            else
-                                echo "npm not available, trying alternative installation..."
-
-                                # Method 2: Try downloading ARM64 binary directly
-                                curl -L -o rover.tar.gz https://github.com/apollographql/rover/releases/latest/download/rover-v0.20.0-aarch64-unknown-linux-gnu.tar.gz
-                                tar -xzf rover.tar.gz
-                                sudo mv rover /usr/local/bin/rover
-                                rm rover.tar.gz
-                            fi
-                        else
-                            echo "x86_64 detected, using standard installation..."
-                            # Standard installation for x86_64
-                            curl -sSL https://rover.apollo.dev/nix/latest | sh
-                            export PATH="$HOME/.rover/bin:$PATH"
-                            echo "export PATH=$HOME/.rover/bin:$PATH" >> ~/.bashrc
-                        fi
-
-                        # Verify installation
-                        rover --version || echo "Rover installation completed"
-                    '''
-                }
-            }
-        }
-
         stage('Publish Schema') {
             steps {
                 script {
                     // Equivalent to publish step from publish-schema-staging.yml
                     try {
                         sh '''
-                            # Set PATH to include both possible Rover locations
-                            export PATH="$HOME/.rover/bin:$HOME/.npm-global/bin:/usr/local/bin:$PATH"
-
-                            # Verify Rover is available
-                            which rover || echo "Rover not found in PATH"
-
-                            # Publish schema
+                            # Apollo Rover is pre-installed in Docker container
                             rover subgraph publish ${GRAPH_ID}@staging \
                                 --schema ./accounts.graphql \
                                 --name $SUBGRAPH \
